@@ -1,0 +1,158 @@
+import pygame
+import numpy as np
+import random
+import time
+
+COLOR_BG = (10, 10, 10) 
+COLOR_GRID = (40, 40, 40) 
+COLOR_DIE_NEXT = (170, 170, 170) 
+COLOR_ALIVE_NEXT = (255, 182, 193)
+
+#ASSIGNEMENTS
+PATTERNS = {
+    "block": np.array([[1,1], [1,1]]),  #Still Life
+    "blinker": np.array([[1,1,1]]),  #Oscillator
+    "glider": np.array([[0,0,1], [1,0,1], [0,1,1]]),  #Spaceship
+    "eater_one": np.array([[1,1,0,0], [1,0,1,0], [0,0,1,0], [0,0,1,1]]), #Still Life
+    "herschel": np.array([[1,0,0], [1,1,1], [1,0,1], [0,0,1]]), #Methuselah (Advanced pattern)
+    "switch_engine": np.array([[0,1,0,1,0,0], [1,0,0,0,0,0], [0,1,0,0,1,0], [0,0,0,1,1,1]]), #Methuselah (Advanced pattern)
+    "gosper_glider_gun": np.array([
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0],
+    [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]) #Gun (Advanced pattern)
+}
+
+def update(screen, cells, size, with_progress=False):
+    update_cells = np.zeros(cells.shape, dtype=int)
+    rows, cols = cells.shape
+    
+    for row, col in np.ndindex(cells.shape):
+        alive = sum(
+            cells[(row + i) % rows, (col + j) % cols]
+            for i in [-1, 0, 1]
+            for j in [-1, 0, 1]
+            if not (i == 0 and j == 0)
+        )
+        
+        color = COLOR_BG if cells[row, col] == 0 else COLOR_ALIVE_NEXT
+        
+        if cells[row, col] == 1:
+            if alive < 2 or alive > 3:
+                if with_progress:
+                    color = COLOR_DIE_NEXT
+            elif 2 <= alive <= 3:
+                update_cells[row, col] = 1
+                if with_progress:
+                    color = COLOR_ALIVE_NEXT
+        else:
+            if alive == 3:
+                update_cells[row, col] = 1
+                if with_progress:
+                    color = COLOR_ALIVE_NEXT
+        
+        pygame.draw.rect(screen, color, (col * size, row * size, size - 1, size - 1))
+    
+    return update_cells
+
+def reset(cells, rows, cols, sigma=10):
+    m = 3  # Numero di centri gaussiani
+    centers = np.column_stack((np.random.randint(0, rows, size=m), np.random.randint(0, cols, size=m)))
+    prob_grid = np.zeros(cells.shape)
+    for center in centers:
+        distance_squared = (np.indices(cells.shape)[0] - center[0])**2 + (np.indices(cells.shape)[1] - center[1])**2
+        prob_grid += np.exp(-distance_squared / (2 * sigma**2))
+    prob_grid /= prob_grid.max()
+    cells[:, :] = np.random.rand(rows, cols) < prob_grid
+
+
+def generate_random(cells):
+    cells[:, :] = np.random.randint(0, 2, size=cells.shape)
+    return cells
+
+def insert_pattern(cells, pattern_name, x, y):
+    pattern = PATTERNS.get(pattern_name)
+    if pattern is not None:
+        rows, cols = pattern.shape
+        cells[x:x+rows, y:y+cols] = pattern
+    return cells
+
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((1200, 600))
+    clock = pygame.time.Clock()
+    cells = np.zeros((80, 120))  
+    size = 10  
+    screen.fill(COLOR_GRID)
+    rows, cols = 80, 120
+    cells = np.zeros((rows, cols), dtype=int)
+    reset(cells, rows, cols)  # Reset con la nuova funzionalità gaussiana
+    update(screen, cells, size)
+    pygame.display.flip()
+    
+    running = False
+    drawing = False
+    selected_pattern = "glider"  
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    running = not running
+                elif event.key == pygame.K_q: 
+                    cells = reset(cells)
+                elif event.key == pygame.K_g:  
+                    cells = generate_random(cells)
+                    update(screen, cells, size)
+                    pygame.display.update()
+                elif event.key == pygame.K_1:
+                    selected_pattern = "block" #key1 to print block 
+                elif event.key == pygame.K_2:
+                    selected_pattern = "blinker" #key2 to print blinker 
+                elif event.key == pygame.K_3:
+                    selected_pattern = "glider" #key3 to print glider 
+                elif event.key == pygame.K_4:
+                    selected_pattern = "eater_one" #key4 to print eater 1 
+                elif event.key == pygame.K_5:
+                    selected_pattern = "herschel" #key5 to print herschel 
+                elif event.key == pygame.K_6:
+                    selected_pattern = "switch_engine" #key6 to print switch engine 
+                elif event.key == pygame.K_7:
+                    selected_pattern = "gosper_glider_gun" #key7 to print gosper glider gun 
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                pos = pygame.mouse.get_pos()
+                row,col= pos[1]// size, pos[0]//size  #Convert pixels coordinates to grid index  
+                if event.button == 1:
+                    drawing = True
+                    cells[row, col] = 1
+                elif event.button == 3:  #Right-click=insert the selected pattern
+                    cells = insert_pattern(cells, selected_pattern, row, col)
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                drawing = False
+            elif event.type == pygame.MOUSEMOTION and drawing:
+                pos = pygame.mouse.get_pos()
+                row,col =pos[1]//size,pos[0]//size
+                cells[row,col] = 1  
+
+        screen.fill(COLOR_GRID)
+        if running:
+            cells = update(screen, cells, size, with_progress=True)
+        else:
+            update(screen, cells, size)
+
+        pygame.display.update()
+        clock.tick(10)
+        time.sleep(0.001)
+
+if __name__ == '__main__':
+    main()
